@@ -1,9 +1,13 @@
 <?php 
+$money = 100*100;
+$number = 15;
+$users = 15;
+
 $fp = stream_socket_client("tcp://127.0.0.1:9001", $errno, $errstr, 30);
 if (!$fp) {
     echo "$errstr ($errno)<br />\n";
 } else {
-		$command = json_encode(array("cmd"=>"SET", "args"=>array(10000, 55)));
+		$command = json_encode(array("cmd"=>"SET", "args"=>array($money, $number)));
 		$n = strlen($command);
 		//tricky
 		if(pack('L', 1) === pack('N', 1))
@@ -47,44 +51,46 @@ if(!is_numeric($id))
 }
 
 // exit;
-
-$fp = stream_socket_client("tcp://127.0.0.1:9001", $errno, $errstr, 30);
-if (!$fp) {
-    echo "$errstr ($errno)<br />\n";
-} else {
-		$command = json_encode(array("cmd"=>"GET", "args"=>array($id, "Julius")));
-		$n = strlen($command);
-		//tricky
-		if(pack('L', 1) === pack('N', 1))
-		{
-			$bin = strrev(pack('l', $n));
-		}else{
-			$bin = pack('l', $n);
-		}
-		$bin .= $command;
-
-    fwrite($fp, $bin);
-    stream_set_blocking ($fp, 0);
-    usleep(500000);
-    $_responseHeader = @fread($fp, 4);
-    if($_responseHeader)
-    {
-    	//tricky
+for($i=1;$i<=$users;$i++)
+{
+	$fp = stream_socket_client("tcp://127.0.0.1:9001", $errno, $errstr, 30);
+	if (!$fp) {
+	    echo "$errstr ($errno)<br />\n";
+	} else {
+			$command = json_encode(array("cmd"=>"GET", "args"=>array($id, "Julius_".$i)));
+			$n = strlen($command);
+			//tricky
 			if(pack('L', 1) === pack('N', 1))
 			{
-				$length = unpack('llen', strrev($_responseHeader));
+				$bin = strrev(pack('l', $n));
 			}else{
-				$length = unpack('llen', $_responseHeader);
+				$bin = pack('l', $n);
 			}
+			$bin .= $command;
 
-			$json = @fread($fp, $length['len']);
-    }
-	  
-    
-    stream_socket_shutdown($fp, STREAM_SHUT_WR);
-    fclose($fp);
+	    fwrite($fp, $bin);
+	    stream_set_blocking ($fp, 0);
+	    usleep(500000);
+	    $_responseHeader = @fread($fp, 4);
+	    if($_responseHeader)
+	    {
+	    	//tricky
+				if(pack('L', 1) === pack('N', 1))
+				{
+					$length = unpack('llen', strrev($_responseHeader));
+				}else{
+					$length = unpack('llen', $_responseHeader);
+				}
+
+				$json = @fread($fp, $length['len']);
+	    }
+		  
+	    
+	    stream_socket_shutdown($fp, STREAM_SHUT_WR);
+	    fclose($fp);
+	}
+
+	var_dump($json);
 }
-
-var_dump($json);
 
 ?>

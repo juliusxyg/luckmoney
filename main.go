@@ -18,6 +18,7 @@ import (
 	"strings"
 	"log"
 	"fmt"
+	//mongodb client
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -166,9 +167,6 @@ func doSet(conn net.Conn, args []interface{}) {
 
 //parogram mark - GET command {cmd:"GET", args:[envelopId-integer, nickname-string]}
 func doGet(conn net.Conn, args []interface{}) {
-	var name string
-	var ok bool
-	var n json.Number
 	respCode := &RespCode{}
 
 	defer func() {
@@ -180,32 +178,42 @@ func doGet(conn net.Conn, args []interface{}) {
 		}
 	}()
 
-	if n, ok = args[0].(json.Number); !ok {
+	n, ok := args[0].(json.Number);
+	if !ok {
 		panic("FAILED: bad id")
 	}
 	id, _ := strconv.ParseInt(string(n), 10, 64)
 
-	if name, ok = args[1].(string); !ok {
+	name, ok := args[1].(string);
+	if !ok {
 		panic("FAILED: bad name")
 	}
 
-	if envelop, ok := luckymoney.TableEnvelopes[id]; ok {
+	envelop, ok := luckymoney.TableEnvelopes[id]
+	if !ok {
+		DEBUG("to read from mongo")
+		envelop = readFromMgo(id)
+		if envelop != nil {
+			luckymoney.TableEnvelopes[id] = envelop
+			ok = true
+		}
+	}
+
+	if ok {
 		opened := envelop.OpenRandom(name)
 
 		if opened == nil {
 			respCode.Code = 0
 			respCode.Message = "SUCCESS"
 			respCode.Data = 0
-			sendResponse(respCode, conn)
-			return
+		}else{
+			DEBUG("envelop id: ",id, " grabber: ", opened.Grabber, " money: ", opened.Money, " timestamp: ", opened.GrabTime)
+			DEBUG("total envelopes: ", len(luckymoney.TableEnvelopes))
+			respCode.Code = 0
+			respCode.Message = "SUCCESS"
+			respCode.Data = opened.Money
 		}
 
-		DEBUG("envelop id: ",id, " grabber: ", opened.Grabber, " money: ", opened.Money, " timestamp: ", opened.GrabTime)
-		DEBUG("total envelopes: ", len(luckymoney.TableEnvelopes))
-
-		respCode.Code = 0
-		respCode.Message = "SUCCESS"
-		respCode.Data = opened.Money
 		sendResponse(respCode, conn)
 
 		go storeInMgo(id)
@@ -214,7 +222,30 @@ func doGet(conn net.Conn, args []interface{}) {
 	}
 }
 
-//program mark - store data in mongo, channed used limit connection
+//program mark - read from mongo
+func readFromMgo(id int64) *luckymoney.M_envelop {
+	session, err := mgo.Dial(mongodb_addr)
+  if err != nil {
+    ERR("[mongodb]", err)
+    return nil
+  }
+  defer session.Close()
+
+  session.SetMode(mgo.Monotonic, true)
+  c := session.DB("luckymoney").C("envelops")
+
+  envelop := new(luckymoney.M_envelop)
+
+  err = c.Find(bson.M{"id": id}).One(envelop)
+  if err != nil {
+    ERR("[mongodb]", err)
+    return nil
+  }
+
+  return envelop
+}
+
+//program mark - store data in mongo aysnced, channed used limit connection
 var bufferedMongoChannel = make(chan bool, 100)
 func storeInMgo(id int64) {
 	if envelop, ok := luckymoney.TableEnvelopes[id]; ok {
@@ -223,7 +254,7 @@ func storeInMgo(id int64) {
 			defer func(){ <-bufferedMongoChannel }()
 			session, err := mgo.Dial(mongodb_addr)
 	    if err != nil {
-	      ERR(err)
+	      ERR("[mongodb]", err)
 	      return
 	    }
 	    defer session.Close()
@@ -232,10 +263,16 @@ func storeInMgo(id int64) {
 	    c := session.DB("luckymoney").C("envelops")
 	    _, err = c.Upsert(bson.M{"id": id}, envelop)
 	    if err != nil {
-	      ERR(err)
+	      ERR("[mongodb]", err)
+	      return
 		  }
 
 		  DEBUG("save in mongo, id: ", id)
+
+		  if envelop.Opened == envelop.Size {
+		  	DEBUG("all grabbed, delete from memory")
+		  	delete(luckymoney.TableEnvelopes, id)
+		  }
 		}()
 	}
 }
