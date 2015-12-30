@@ -43,6 +43,25 @@ func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
 
+func (remain *M_envelop) OpenLastFind(name string) *M_envelop_piece {
+	if remain.Opened == 0 {
+		return nil
+	}
+
+	if len(name) == 0 {
+		return nil
+	}
+
+	for _, cursor := range remain.Pieces {
+  	if cursor.Grabber == name {
+  		return &cursor
+		}
+	} 
+
+	return nil
+}
+
+//随机取出
 func (remain *M_envelop) OpenRandom(name string) *M_envelop_piece {
 	if remain.Size == remain.Opened {
 		return nil
@@ -51,7 +70,8 @@ func (remain *M_envelop) OpenRandom(name string) *M_envelop_piece {
 	if len(name) == 0 {
 		return nil
 	}
-	//从链表里随机取出一个???
+
+	//从slice里随机取出一个，原子性
 	randIdx := rand.Intn(remain.Size - remain.Opened)
 	itr := 0
 
@@ -74,6 +94,7 @@ func (remain *M_envelop) OpenRandom(name string) *M_envelop_piece {
 	return &remain.Pieces[itr]
 }
 
+//初始化红包堆
 func Distribute(money float64, number int) int64 {
 	if money <= 0 || number <= 0 {
 		return -1

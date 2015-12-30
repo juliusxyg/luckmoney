@@ -57,7 +57,7 @@ for($i=1;$i<=$users;$i++)
 	if (!$fp) {
 	    echo "$errstr ($errno)<br />\n";
 	} else {
-			$command = json_encode(array("cmd"=>"GET", "args"=>array($id, "Julius_".$i)));
+			$command = json_encode(array("cmd"=>"GET", "args"=>array($id, "Julius_".($i%5))));
 			$n = strlen($command);
 			//tricky
 			if(pack('L', 1) === pack('N', 1))

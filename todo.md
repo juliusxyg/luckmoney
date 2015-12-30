@@ -14,7 +14,39 @@ x clean内存表，已经抢光的话就可以用内存表中移除，
 ? 或者长时间没人访问，从mongo读取，冷热数据
 x 需要一些统计变量：红包数，抢光的红包，遗留的红包，等
 ？网关处理多个服务器后端
-？一个红包堆一次只能由一个人抓，保证原子性
+x 一个红包堆一次只能由一个人抓，保证原子性
+x 判断抓到过的人不能再抓
+
+#########################################################################
+? Share memory by communicating, don't communicate by sharing memory.
+e.g.
+package main
+
+import "fmt"
+
+type UpdateOp struct {
+	key   int
+	value string
+}
+
+func applyUpdate(data map[int]string, op UpdateOp) {
+	data[op.key] = op.value
+}
+
+func main() {
+	m := make(map[int]string)
+	m[2] = "asdf"
+	
+	ch := make(chan UpdateOp)
+	
+	go func(ch chan UpdateOp) {
+		ch <- UpdateOp{2, "New Value"}
+	}(ch)
+	
+	applyUpdate(m, <- ch)
+	fmt.Printf("%s\n", m[2])
+}
+#########################################################################
 
 mongo 数据库结构
 

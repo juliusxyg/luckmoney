@@ -21,6 +21,8 @@ import (
 	//mongodb client
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	//mutex
+	"sync"
 )
 
 const server_addr string = "127.0.0.1:9001"
@@ -41,6 +43,7 @@ func main() {
     ERR("Fatal error: ", err.Error())
     os.Exit(0)
   }
+  session.Close()
   INFO("mongodb checked")
 
 	//socket srv
@@ -166,6 +169,7 @@ func doSet(conn net.Conn, args []interface{}) {
 }
 
 //parogram mark - GET command {cmd:"GET", args:[envelopId-integer, nickname-string]}
+var mutex = &sync.Mutex{}
 func doGet(conn net.Conn, args []interface{}) {
 	respCode := &RespCode{}
 
@@ -200,7 +204,12 @@ func doGet(conn net.Conn, args []interface{}) {
 	}
 
 	if ok {
-		opened := envelop.OpenRandom(name)
+		opened := envelop.OpenLastFind(name)
+		if opened == nil {
+			mutex.Lock()
+			opened = envelop.OpenRandom(name)
+			mutex.Unlock()
+		}
 
 		if opened == nil {
 			respCode.Code = 0
@@ -245,7 +254,7 @@ func readFromMgo(id int64) *luckymoney.M_envelop {
   return envelop
 }
 
-//program mark - store data in mongo aysnced, channed used limit connection
+//program mark - store data in mongo aysnced, channed used limit connections
 var bufferedMongoChannel = make(chan bool, 100)
 func storeInMgo(id int64) {
 	if envelop, ok := luckymoney.TableEnvelopes[id]; ok {
