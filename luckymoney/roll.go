@@ -27,7 +27,7 @@ type M_envelop_piece struct {
 }
 
 type M_envelop struct {
-	Id int64
+	Id uint64
 	Money float64
 	Size int
 	CreatedAt int64
@@ -36,7 +36,7 @@ type M_envelop struct {
 }
 
 //table
-var TableEnvelopes = make(map[int64]*M_envelop)
+var TableEnvelopes = make(map[uint64]*M_envelop)
 
 func init() {
 	//need to set seed when init() called, otherwise rand out value will be the same
@@ -95,9 +95,9 @@ func (remain *M_envelop) OpenRandom(name string) *M_envelop_piece {
 }
 
 //初始化红包堆
-func Distribute(money float64, number int) int64 {
-	if money <= 0 || number <= 0 {
-		return -1
+func Distribute(id uint64, money float64, number int) bool {
+	if money <= 0 || number <= 0 || id <= 0 {
+		return false
 	}
 	moneyLeft := money - float64(number) * MIN_AMOUNT
 	var mu float64
@@ -106,11 +106,9 @@ func Distribute(money float64, number int) int64 {
 	//rand a sigma factor
 	sigma_factor := rand.Intn(SIGMA_FACTOR_MAX - SIGMA_FACTOR_MIN) + SIGMA_FACTOR_MIN
 
-	id_of_envelops := time.Now().UTC().UnixNano();
-
   envelops := new(M_envelop)
   envelops.Size = number
-  envelops.Id = id_of_envelops
+  envelops.Id = id
   envelops.CreatedAt = time.Now().Unix()
   envelops.Opened = 0
   envelops.Money = money
@@ -142,7 +140,7 @@ func Distribute(money float64, number int) int64 {
 		moneyLeft -= noise
 	}
 
-	return id_of_envelops
+	return true
 }
 
 //期望值mu 和 标准差sigma， mu 为当前红包的均值，

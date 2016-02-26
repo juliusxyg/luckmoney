@@ -13,9 +13,13 @@ x 刷入数据库，发红包，抢红包时, 用channel做？
 x clean内存表，已经抢光的话就可以用内存表中移除， 
 ? 或者长时间没人访问，从mongo读取，冷热数据
 x 需要一些统计变量：红包数，抢光的红包，遗留的红包，等
-？网关处理多个服务器后端
+？加个网关，网关处理多个服务器后端
+x 优化uniqueid (each golang machine can only work with one process?!)
 x 一个红包堆一次只能由一个人抓，保证原子性
 x 判断抓到过的人不能再抓
+? benchmark test
+? test script to simulate multi-user playing
+? refactor module
 
 #########################################################################
 ? Share memory by communicating, don't communicate by sharing memory.

@@ -10,7 +10,8 @@ const EPSILON float64 = 0.00000001
 func TestDistributeNormal(t *testing.T) {
 	money := 99.99
 	number := 10
-	id := Distribute(money, number)
+	var id uint64 = 1
+	Distribute(id, money, number)
 
 	if _, ok := TableEnvelopes[id]; !ok {
 		t.Error("Distribute Normal Remain list failed")
@@ -36,10 +37,11 @@ func TestDistributeNormal(t *testing.T) {
 func TestDistributeZeroMoney(t *testing.T) {
 	money := 0.00
 	number := 10
+	var id uint64 = 1
 
-	id := Distribute(money, number)
+	res := Distribute(id, money, number)
 
-	if id != -1 {
+	if res != false {
 		t.Error("Distribute Zero Money failed")
 	}
 }
@@ -47,10 +49,11 @@ func TestDistributeZeroMoney(t *testing.T) {
 func TestDistributeNegtiveMoney(t *testing.T) {
 	money := -100.00
 	number := 10
+	var id uint64 = 1
 
-	id := Distribute(money, number)
+	res := Distribute(id, money, number)
 
-	if id != -1 {
+	if res != false {
 		t.Error("Distribute Negtive Money failed")
 	}
 }
@@ -58,10 +61,11 @@ func TestDistributeNegtiveMoney(t *testing.T) {
 func TestDistributeZeroNumber(t *testing.T) {
 	money := 100.00
 	number := 0
+	var id uint64 = 1
 
-	id := Distribute(money, number)
+	res := Distribute(id, money, number)
 
-	if id != -1 {
+	if res != false {
 		t.Error("Distribute Zero Number failed")
 	}
 }
@@ -69,10 +73,11 @@ func TestDistributeZeroNumber(t *testing.T) {
 func TestDistributeNegtiveNumber(t *testing.T) {
 	money := 100.00
 	number := -10
+	var id uint64 = 1
 
-	id := Distribute(money, number)
+	res := Distribute(id, money, number)
 
-	if id != -1 {
+	if res != false {
 		t.Error("Distribute Negtive Number failed")
 	}
 }
@@ -80,7 +85,8 @@ func TestDistributeNegtiveNumber(t *testing.T) {
 func TestOpenRandomNormal(t *testing.T) {
 	money := 99.99
 	number := 5
-	id := Distribute(money, number)
+	var id uint64 = 1
+	Distribute(id, money, number)
 
 	envelop := TableEnvelopes[id].OpenRandom("Julius")
 
@@ -118,7 +124,8 @@ func TestOpenRandomNormal(t *testing.T) {
 func TestOpenRandomNoName(t *testing.T) {
 	money := 99.99
 	number := 5
-	id := Distribute(money, number)
+	var id uint64 = 1
+	Distribute(id, money, number)
 
 	envelop := TableEnvelopes[id].OpenRandom("")
 

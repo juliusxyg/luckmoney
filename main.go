@@ -2,6 +2,7 @@ package main
 
 import (
 	"luckymoneysrv/luckymoney"
+	"luckymoneysrv/misc"
 	"net"
 	"os"
 	"io"
@@ -14,9 +15,7 @@ import (
 	//json-api
 	"strconv"
 	"encoding/json"
-	//log
-	"strings"
-	"log"
+	//misc
 	"fmt"
 	//mongodb client
 	"gopkg.in/mgo.v2"
@@ -31,36 +30,41 @@ const mongodb_addr string = "mongodb://127.0.0.1:27017"
 func main() {
 	defer profile.Start(profile.CPUProfile).Stop()
 	
+	err := misc.CheckUniqueId()
+	if err!=nil {
+		misc.ERR("Fatal error: ", err.Error())
+    os.Exit(0)
+	}
 	//check mongo
-	INFO("checking mongodb connection")
+	misc.INFO("checking mongodb connection")
 	session, err := mgo.Dial(mongodb_addr)
   if err != nil {
-    ERR("Fatal error: ", err.Error())
+    misc.ERR("Fatal error: ", err.Error())
     os.Exit(0)
   }
   err = session.Ping()
   if err != nil {
-    ERR("Fatal error: ", err.Error())
+    misc.ERR("Fatal error: ", err.Error())
     os.Exit(0)
   }
   session.Close()
-  INFO("mongodb checked")
+  misc.INFO("mongodb checked")
 
 	//socket srv
-	INFO("establishing server")
+	misc.INFO("establishing server")
 	srvAddr := server_addr
 	tcpAddr, err := net.ResolveTCPAddr("tcp4", srvAddr)
 	if err != nil {
-		ERR("Fatal error: ", err.Error())
+		misc.ERR("Fatal error: ", err.Error())
 		os.Exit(0)
 	}
 
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
-		ERR("Fatal error: ", err.Error())
+		misc.ERR("Fatal error: ", err.Error())
 		os.Exit(0)
 	}
-	INFO("server started")
+	misc.INFO("server started")
 
 	for {
 		conn, err := listener.Accept()
@@ -81,10 +85,10 @@ func handleClient(conn net.Conn) {
 		data, readErr := Decode(reader)
 
 		if readErr == io.EOF {
-			INFO("connection closed\r\n")
+			misc.INFO("connection closed\r\n")
 			return
 		}else if readErr != nil {
-			INFO("Read Parse Error: %s\r\n", readErr.Error())
+			misc.INFO("Read Parse Error: %s\r\n", readErr.Error())
 			return
 		}
 
@@ -93,7 +97,7 @@ func handleClient(conn net.Conn) {
 		d := json.NewDecoder(bytes.NewBuffer(data))
     d.UseNumber()
     if err := d.Decode(cmd); err != nil {
-      WARN("failed to decode\r\n")
+      misc.WARN("failed to decode\r\n")
 			return
     }
 
@@ -111,13 +115,13 @@ func handleClient(conn net.Conn) {
 func sendResponse(respCode *RespCode, conn net.Conn) {
 	respJson, respJsonErr := json.Marshal(respCode);
 	if respJsonErr != nil {
-		INFO("resp json encode error")
+		misc.INFO("resp json encode error")
 		return
 	}
 
 	respJsonData, respJsonDataErr := Encode(respJson);
 	if respJsonDataErr != nil {
-		INFO("resp json codec error")
+		misc.INFO("resp json codec error")
 		return
 	}
 
@@ -154,14 +158,21 @@ func doSet(conn net.Conn, args []interface{}) {
 
 	number := int(numberArg)
   money := float64(moneyInCent/100)
-	id := luckymoney.Distribute(money, number)
+  id := misc.UniqueId()
+	ok = luckymoney.Distribute(id, money, number)
 
-	DEBUG("set pool for money:  ", money, " number: ", number)
-	DEBUG("envelop id: ", id)
+	if !ok {
+		misc.WARN("Distribute failed. money: ", money, " number: ", number)
+		panic("FAILED: create error")
+	}
+
+	misc.DEBUG("Distribute success. money:  ", money, " number: ", number)
+	misc.DEBUG("envelop id: ", id)
 
 	respCode.Code = 0
 	respCode.Message = "SUCCESS"
 	respCode.Data = id
+	
 
 	sendResponse(respCode, conn)
 
@@ -186,7 +197,7 @@ func doGet(conn net.Conn, args []interface{}) {
 	if !ok {
 		panic("FAILED: bad id")
 	}
-	id, _ := strconv.ParseInt(string(n), 10, 64)
+	id, _ := strconv.ParseUint(string(n), 10, 64)
 
 	name, ok := args[1].(string);
 	if !ok {
@@ -195,7 +206,7 @@ func doGet(conn net.Conn, args []interface{}) {
 
 	envelop, ok := luckymoney.TableEnvelopes[id]
 	if !ok {
-		DEBUG("to read from mongo")
+		misc.DEBUG("to read from mongo")
 		envelop = readFromMgo(id)
 		if envelop != nil {
 			luckymoney.TableEnvelopes[id] = envelop
@@ -216,8 +227,8 @@ func doGet(conn net.Conn, args []interface{}) {
 			respCode.Message = "SUCCESS"
 			respCode.Data = 0
 		}else{
-			DEBUG("envelop id: ",id, " grabber: ", opened.Grabber, " money: ", opened.Money, " timestamp: ", opened.GrabTime)
-			DEBUG("total envelopes: ", len(luckymoney.TableEnvelopes))
+			misc.DEBUG("envelop id: ",id, " grabber: ", opened.Grabber, " money: ", opened.Money, " timestamp: ", opened.GrabTime)
+			misc.DEBUG("total envelopes: ", len(luckymoney.TableEnvelopes))
 			respCode.Code = 0
 			respCode.Message = "SUCCESS"
 			respCode.Data = opened.Money
@@ -232,10 +243,10 @@ func doGet(conn net.Conn, args []interface{}) {
 }
 
 //program mark - read from mongo
-func readFromMgo(id int64) *luckymoney.M_envelop {
+func readFromMgo(id uint64) *luckymoney.M_envelop {
 	session, err := mgo.Dial(mongodb_addr)
   if err != nil {
-    ERR("[mongodb]", err)
+    misc.ERR("[mongodb]", err)
     return nil
   }
   defer session.Close()
@@ -247,7 +258,7 @@ func readFromMgo(id int64) *luckymoney.M_envelop {
 
   err = c.Find(bson.M{"id": id}).One(envelop)
   if err != nil {
-    ERR("[mongodb]", err)
+    misc.ERR("[mongodb]", err)
     return nil
   }
 
@@ -256,14 +267,14 @@ func readFromMgo(id int64) *luckymoney.M_envelop {
 
 //program mark - store data in mongo aysnced, channed used limit connections
 var bufferedMongoChannel = make(chan bool, 100)
-func storeInMgo(id int64) {
+func storeInMgo(id uint64) {
 	if envelop, ok := luckymoney.TableEnvelopes[id]; ok {
 		bufferedMongoChannel <- true
 		go func() {
 			defer func(){ <-bufferedMongoChannel }()
 			session, err := mgo.Dial(mongodb_addr)
 	    if err != nil {
-	      ERR("[mongodb]", err)
+	      misc.ERR("[mongodb]", err)
 	      return
 	    }
 	    defer session.Close()
@@ -272,14 +283,14 @@ func storeInMgo(id int64) {
 	    c := session.DB("luckymoney").C("envelops")
 	    _, err = c.Upsert(bson.M{"id": id}, envelop)
 	    if err != nil {
-	      ERR("[mongodb]", err)
+	      misc.ERR("[mongodb]", err)
 	      return
 		  }
 
-		  DEBUG("save in mongo, id: ", id)
+		  misc.DEBUG("save in mongo, id: ", id)
 
 		  if envelop.Opened == envelop.Size {
-		  	DEBUG("all grabbed, delete from memory")
+		  	misc.DEBUG("all grabbed, delete from memory")
 		  	delete(luckymoney.TableEnvelopes, id)
 		  }
 		}()
@@ -338,23 +349,3 @@ func Decode(reader *bufio.Reader) ([]byte, error) {
   return pkg[4:], nil
 }
 
-//program mark -- log error level
-func ERR(v ...interface{}) {
-	log.Printf("\033[1;4;31m[ERROR] %v \033[0m\n", strings.TrimRight(fmt.Sprintln(v...), "\n"))
-}
-
-func WARN(v ...interface{}) {
-	log.Printf("\033[1;33m[WARN] %v \033[0m\n", strings.TrimRight(fmt.Sprintln(v...), "\n"))
-}
-
-func INFO(v ...interface{}) {
-	log.Printf("\033[32m[INFO] %v \033[0m\n", strings.TrimRight(fmt.Sprintln(v...), "\n"))
-}
-
-func NOTICE(v ...interface{}) {
-	log.Printf("[NOTICE] %v\n", strings.TrimRight(fmt.Sprintln(v...), "\n"))
-}
-
-func DEBUG(v ...interface{}) {
-	log.Printf("\033[1;35m[DEBUG] %v \033[0m\n", strings.TrimRight(fmt.Sprintln(v...), "\n"))
-}
