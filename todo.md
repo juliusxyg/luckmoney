@@ -17,7 +17,7 @@ x 需要一些统计变量：红包数，抢光的红包，遗留的红包，等
 x 优化uniqueid (each golang machine can only work with one process?!)
 x 一个红包堆一次只能由一个人抓，保证原子性
 x 判断抓到过的人不能再抓
-? benchmark test
+x benchmark test (create red packet)
 ? test script to simulate multi-user playing
 ? refactor module
 

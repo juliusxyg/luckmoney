@@ -7,6 +7,7 @@ import (
 
 const EPSILON float64 = 0.00000001
 
+//program mark - unittest: go test -v luckymoneysrv/luckymoney
 func TestDistributeNormal(t *testing.T) {
 	money := 99.99
 	number := 10
@@ -133,4 +134,44 @@ func TestOpenRandomNoName(t *testing.T) {
 		t.Error("Open Random no name failed")
 	}
 }
+
+//program mark - benchmark: go test -bench=. luckymoneysrv/luckymoney
+var bench_result bool
+func benchmarkDistribute(number int, b *testing.B) {
+	money := 999.99
+	var id uint64 = 1
+	var r bool
+	
+	for n := 0; n < b.N; n++ {
+		// always record the result of Fib to prevent
+    // the compiler eliminating the function call.
+    r = Distribute(id, money, number)
+  }
+  // always store the result to a package level variable
+  // so the compiler cannot eliminate the Benchmark itself.
+  bench_result = r
+}
+
+func BenchmarkDistribute10(b *testing.B) {
+	benchmarkDistribute(10, b)
+}
+
+func BenchmarkDistribute50(b *testing.B) {
+	benchmarkDistribute(50, b)
+}
+
+func BenchmarkDistribute100(b *testing.B) {
+	benchmarkDistribute(100, b)
+}
+
+func BenchmarkDistribute150(b *testing.B) {
+	benchmarkDistribute(150, b)
+}
+
+func BenchmarkDistribute200(b *testing.B) {
+	benchmarkDistribute(200, b)
+}
+
+
+
 
