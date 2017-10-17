@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"io"
+	_"time"
 	//profiling
 	"github.com/davecheney/profile"
 	//codec
@@ -16,7 +17,7 @@ import (
 	"strconv"
 	"encoding/json"
 	//misc
-	"fmt"
+	_"fmt"
 	//mongodb client
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -24,20 +25,24 @@ import (
 	"sync"
 )
 
-const server_addr string = "127.0.0.1:9001"
-const mongodb_addr string = "mongodb://127.0.0.1:27017"
+const serverAddr string = "127.0.0.1:9001"
+const mongodbAddr string = "mongodb://127.0.0.1:27017"
 
 func main() {
 	defer profile.Start(profile.CPUProfile).Stop()
-	
-	err := misc.CheckUniqueId()
+	/**
+	 start uuid service
+	 */
+	err := misc.StartUUId()
 	if err!=nil {
 		misc.ERR("Fatal error: ", err.Error())
     os.Exit(0)
 	}
-	//check mongo
+	/** 
+	 check mongo
+	 */
 	misc.INFO("checking mongodb connection")
-	session, err := mgo.Dial(mongodb_addr)
+	session, err := mgo.Dial(mongodbAddr)
   if err != nil {
     misc.ERR("Fatal error: ", err.Error())
     os.Exit(0)
@@ -50,9 +55,11 @@ func main() {
   session.Close()
   misc.INFO("mongodb checked")
 
-	//socket srv
+	/**
+	 start listening
+	 */
 	misc.INFO("establishing server")
-	srvAddr := server_addr
+	srvAddr := serverAddr
 	tcpAddr, err := net.ResolveTCPAddr("tcp4", srvAddr)
 	if err != nil {
 		misc.ERR("Fatal error: ", err.Error())
@@ -113,25 +120,25 @@ func handleClient(conn net.Conn) {
 }
 
 func sendResponse(respCode *RespCode, conn net.Conn) {
-	respJson, respJsonErr := json.Marshal(respCode);
-	if respJsonErr != nil {
+	respJSON, respJSONErr := json.Marshal(respCode);
+	if respJSONErr != nil {
 		misc.INFO("resp json encode error")
 		return
 	}
 
-	respJsonData, respJsonDataErr := Encode(respJson);
-	if respJsonDataErr != nil {
+	respJSONData, respJSONDataErr := Encode(respJSON);
+	if respJSONDataErr != nil {
 		misc.INFO("resp json codec error")
 		return
 	}
 
-	_, respErr := conn.Write(respJsonData)
+	_, respErr := conn.Write(respJSONData)
 	if respErr != nil {
 		return
 	}
 }
 
-//parogram mark - SET command {cmd:"SET", args:[moneyInCents-integer, numberOfEnvelops-integer]}
+//parogram mark - SET command {cmd:"SET", args:[moneyInCents int, numberOfEnvelops int]}
 func doSet(conn net.Conn, args []interface{}) {
 	var ok bool
 	var n json.Number
@@ -140,7 +147,7 @@ func doSet(conn net.Conn, args []interface{}) {
 	defer func() {
 		if err := recover(); err != nil {
 			respCode.Code = 1
-			respCode.Message = fmt.Sprintf("v%", err)
+			respCode.Message, _ = err.(string)
 			respCode.Data = nil
 			sendResponse(respCode, conn)
 		}
@@ -158,7 +165,7 @@ func doSet(conn net.Conn, args []interface{}) {
 
 	number := int(numberArg)
   money := float64(moneyInCent/100)
-  id := misc.UniqueId()
+  id := misc.UUId()
 	ok = luckymoney.Distribute(id, money, number)
 
 	if !ok {
@@ -187,7 +194,7 @@ func doGet(conn net.Conn, args []interface{}) {
 	defer func() {
 		if err := recover(); err != nil {
 			respCode.Code = 1
-			respCode.Message = fmt.Sprintf("v%", err)
+			respCode.Message, _ = err.(string)
 			respCode.Data = nil
 			sendResponse(respCode, conn)
 		}
@@ -244,7 +251,7 @@ func doGet(conn net.Conn, args []interface{}) {
 
 //program mark - read from mongo
 func readFromMgo(id uint64) *luckymoney.M_envelop {
-	session, err := mgo.Dial(mongodb_addr)
+	session, err := mgo.Dial(mongodbAddr)
   if err != nil {
     misc.ERR("[mongodb]", err)
     return nil
@@ -272,7 +279,7 @@ func storeInMgo(id uint64) {
 		bufferedMongoChannel <- true
 		go func() {
 			defer func(){ <-bufferedMongoChannel }()
-			session, err := mgo.Dial(mongodb_addr)
+			session, err := mgo.Dial(mongodbAddr)
 	    if err != nil {
 	      misc.ERR("[mongodb]", err)
 	      return
@@ -297,19 +304,20 @@ func storeInMgo(id uint64) {
 	}
 }
 
-//program mark - command json structure
+//Command - json structure
 type Command struct {
 	Cmd string `json:"cmd"`
 	Args []interface{} `json:"args"`
 }
 
+//RespCode - json structure
 type RespCode struct {
-	Code int `json:code`
-	Message string `json:message`
-	Data interface{} `json:data`
+	Code int `json:"code"`
+	Message string `json:"message"`
+	Data interface{} `json:"data"`
 }
 
-//program mark - codec
+//Encode - codec
 func Encode(message []byte) ([]byte, error) {
   length := int32(len(message))
   pkg := new(bytes.Buffer)
@@ -327,6 +335,7 @@ func Encode(message []byte) ([]byte, error) {
   return pkg.Bytes(), nil
 }
 
+//Decode - codec
 func Decode(reader *bufio.Reader) ([]byte, error) {
   // get body-length binary from input and covert to fix-sized variable
   lengthByte, _ := reader.Peek(4)

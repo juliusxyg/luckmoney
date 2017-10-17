@@ -11,7 +11,7 @@ x 不区分remain和opened，管理后台可能有用
 x 刷入数据库，发红包，抢红包时, 用channel做？
 ? mongo index?
 x clean内存表，已经抢光的话就可以用内存表中移除， 
-? 或者长时间没人访问，从mongo读取，冷热数据
+? 或者长时间没人访问，从mongo读取，冷热数据，节约内存的做法
 x 需要一些统计变量：红包数，抢光的红包，遗留的红包，等
 ？加个网关，网关处理多个服务器后端
 x 优化uniqueid (each golang machine can only work with one process?!)

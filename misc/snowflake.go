@@ -6,7 +6,7 @@ import (
 
 var snow *gosnow.SnowFlake
 
-func CheckUniqueId() error {
+func StartUUId() error {
 	s, err := gosnow.Default()
 	if err!=nil {
 		return err
@@ -15,7 +15,7 @@ func CheckUniqueId() error {
 	return nil
 }
 
-func UniqueId() uint64 {
+func UUId() uint64 {
 	id, err := snow.Next()
 	if err!=nil {
 		return 0
